@@ -144,4 +144,23 @@ void CrossEntropyLoss::CalcGrad(const DMatrix* matrix,
   }
 }
 
+// Given data sample and current model, calculate gradient.
+// Note that this method doesn't update local model, and the
+// gradient will be pushed to the parameter server, which is 
+// used for distributed computation.
+void CrossEntropyLoss::CalcGradDist(const DMatrix* data_matrix,
+                                    Model& model,
+                                    std::vector<real_t>& grad) {
+  // Get a mini-batch from the data_matrix
+
+  // Go through the mini-batch, and pull the 
+  // model from parameter server
+
+  // Compress the sparse data matrix and sparse model to dense format
+
+  // Calculate gradient
+
+  // push gradient to the parameter server
+}
+
 } // namespace xLearn

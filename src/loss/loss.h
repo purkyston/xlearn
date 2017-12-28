@@ -103,6 +103,14 @@ class Loss {
   virtual void CalcGrad(const DMatrix* data_matrix, 
                         Model& model) = 0;
 
+  // Given data sample and current model, calculate gradient.
+  // Note that this method doesn't update local model, and the
+  // gradient will be pushed to the parameter server, which is 
+  // used for distributed computation.
+  virtual void CalcGradDist(const DMatrix* data_matrix,
+                            Model& model,
+                            std::vector<real_t>& grad) = 0;
+
   // Return the calculated loss value
   virtual real_t GetLoss() {
     return loss_sum_ / total_example_;

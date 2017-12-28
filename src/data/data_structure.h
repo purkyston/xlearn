@@ -248,6 +248,7 @@ struct DMatrix {
   }
 
   // Compress current sparse matrix to a dense matrix.
+  // This method will be used in distributed computation.
   // For example, the sparse matrix is:
   //  ---------------------------------
   //  |    0:0.1    5:0.1   10:0.1    |
@@ -262,8 +263,8 @@ struct DMatrix {
   //  ------------------------------
   // Also, we can get a hash map to store the mapping relations:
   //  ----------------------------------
-  //  | original id:   0   3   5   10  |
-  //  | new id     :   0   1   2   3   |
+  //  | Original id:   0   3   5   10  |
+  //  | New id     :   0   1   2   3   |
   //  ----------------------------------
   void Compress(DMatrix& dense_matrix, feature_map& mp) {
     // TODO(zpk)
@@ -333,6 +334,20 @@ struct DMatrix {
           dense_matrix.AddNode(i, mp[node.feat_id], node.feat_val, node.field_id);
       }
     }
+  }
+
+  // Given a simple size, get a mini-batch of data from 
+  // curremt data matrix. This method will be used for mini-batch 
+  // GD with distributed training. Return the sample size. Note that 
+  // sample_size <= batch_size
+  index_t GetMiniBatch(index_t batch_size, DMatrix& mini_batch) {
+    CHECK_EQ(mini_batch.row_length, batch_size);
+    for (index_t i = 0; i < batch_size; ++i) {
+      mini_batch.row[i] = this->row[i];
+      mini_batch.Y[i] = this->Y[i];
+      mini_batch.norm[i] = this->norm[i];
+    }
+    return 0;
   }
 
   // Serialize current DMatrix to disk file.
@@ -427,6 +442,7 @@ struct DMatrix {
   std::vector<real_t> norm;
   /* If current dataset has label y */
   bool has_label;
+  index_t cur_pos;
 };
 
 }  // namespace xLearn
