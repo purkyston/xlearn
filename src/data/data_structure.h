@@ -266,16 +266,12 @@ struct DMatrix {
   //  | Original id:   0   3   5   10  |
   //  | New id     :   0   1   2   3   |
   //  ----------------------------------
-  void Compress(DMatrix& dense_matrix, feature_map& mp) {
-    // TODO(zpk)
-    // preprocess
-    std::cout << "Compress Test" << std::endl;
+
+  void CompressBySort(DMatrix& dense_matrix, feature_map& mp) {
     size_t node_num{0};
     for (auto row : this->row) {
       node_num += row->size();
     }
-
-    // Method 1: sort
     std::vector<index_t> feat_list(node_num);
     index_t ind{0};
     for (auto row: this->row) {
@@ -289,20 +285,35 @@ struct DMatrix {
     for (index_t i = 0; i < feat_list.size(); ++ i) {
       mp[feat_list[i]] = i;
     }
+    for (index_t i = 0; i < row_length; ++ i) {
+      for (auto node : *this->row[i]) {
+        dense_matrix.AddNode(i, mp[node.feat_id], node.feat_val, node.field_id);
+      }
+    }
+  }
 
-    // Method 2: unordered_map
+  void CompressByHash(DMatrix& dense_matrix, feature_map& mp) {
+    size_t node_num{0};
+    for (auto row : this->row) {
+      node_num += row->size();
+    }
     mp.reserve(node_num);
     size_t unique_num{0};
-    for (auto row : this->row) {
-      for (auto node: *row) {
-        if (mp.count(node.feat_id) == 0) {
+    for (index_t i = 0; i < this->row_length; ++ i) {
+      for (auto node: *this->row[i]) {
+        auto itr = mp.find(node.feat_id);
+        if (itr == mp.end()) {
           mp[node.feat_id] = unique_num;
+          dense_matrix.AddNode(i, unique_num, node.feat_val);
           ++ unique_num;
+        } else {
+          dense_matrix.AddNode(i, (*itr).second, node.feat_val);
         }
       }
     }
+  }
 
-    // Method 3: heap
+  void CompressByHeap(DMatrix& dense_matrix, feature_map& mp) {
     struct PQNode {
         index_t row_id, col_id, feat_id;
         bool operator< (const PQNode& rhs) const {
@@ -321,19 +332,28 @@ struct DMatrix {
       if (now.feat_id != last) {
         last = now.feat_id;
         mp[last] = unique_num;
+        dense_matrix.AddNode(now.row_id, unique_num, (*this->row[now.row_id])[now.col_id].feat_id);
         ++ unique_num;
+      } else {
+        dense_matrix.AddNode(now.row_id, unique_num - 1, (*this->row[now.row_id])[now.col_id]);
       }
       if (now.col_id + 1 < (*this->row[now.row_id]).size()) {
         pq.push(PQNode{now.row_id, now.col_id + 1, (*this->row[now.row_id])[now.col_id + 1].feat_id});
       }
     }
+  }
 
-    // postprocess
-    for (index_t i = 0; i < row_length; ++ i) {
-      for (auto node : *this->row[i]) {
-          dense_matrix.AddNode(i, mp[node.feat_id], node.feat_val, node.field_id);
-      }
-    }
+  void Compress(DMatrix& dense_matrix, feature_map& mp) {
+    // TODO(zpk)
+    DMatrix d1;
+    feature_map mp1;
+    CompressBySort(d1, mp1);
+    DMatrix d2;
+    feature_map mp2;
+    CompressByHash(d2, mp2);
+    DMatrix d3;
+    feature_map mp3;
+    CompressByHeap(d3, mp3);
   }
 
   // Given a simple size, get a mini-batch of data from 
