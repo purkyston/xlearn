@@ -23,6 +23,8 @@ This file defines the basic data structures used by xLearn.
 #ifndef XLEARN_DATA_DATA_STRUCTURE_H_
 #define XLEARN_DATA_DATA_STRUCTURE_H_
 
+#include <algorithm>
+#include <queue>
 #include <vector>
 #include <unordered_map>
 
@@ -265,6 +267,72 @@ struct DMatrix {
   //  ----------------------------------
   void Compress(DMatrix& dense_matrix, feature_map& mp) {
     // TODO(zpk)
+    // preprocess
+    std::cout << "Compress Test" << std::endl;
+    size_t node_num{0};
+    for (auto row : this->row) {
+      node_num += row->size();
+    }
+
+    // Method 1: sort
+    std::vector<index_t> feat_list(node_num);
+    index_t ind{0};
+    for (auto row: this->row) {
+      for(auto i : *row) {
+        feat_list[ind] = i.feat_id;
+        ++ ind;
+      }
+    }
+    std::sort(begin(feat_list), end(feat_list));
+    feat_list.erase(std::unique(begin(feat_list), end(feat_list)), end(feat_list));
+    for (index_t i = 0; i < feat_list.size(); ++ i) {
+      mp[feat_list[i]] = i;
+    }
+
+    // Method 2: unordered_map
+    mp.reserve(node_num);
+    size_t unique_num{0};
+    for (auto row : this->row) {
+      for (auto node: *row) {
+        if (mp.count(node.feat_id) == 0) {
+          mp[node.feat_id] = unique_num;
+          ++ unique_num;
+        }
+      }
+    }
+
+    // Method 3: heap
+    struct PQNode {
+        index_t row_id, col_id, feat_id;
+        bool operator< (const PQNode& rhs) const {
+          return col_id > rhs.col_id;
+        }
+    };
+    std::priority_queue<PQNode> pq;
+    for (index_t i = 0; i < row_length; ++ i) {
+      pq.push(PQNode{i, 0, (*this->row[i])[0].feat_id});
+    }
+    index_t last(-1);
+    unique_num = 0;
+    while(!pq.empty()) {
+      auto now = pq.top();
+      pq.pop();
+      if (now.feat_id != last) {
+        last = now.feat_id;
+        mp[last] = unique_num;
+        ++ unique_num;
+      }
+      if (now.col_id + 1 < (*this->row[now.row_id]).size()) {
+        pq.push(PQNode{now.row_id, now.col_id + 1, (*this->row[now.row_id])[now.col_id + 1].feat_id});
+      }
+    }
+
+    // postprocess
+    for (index_t i = 0; i < row_length; ++ i) {
+      for (auto node : *this->row[i]) {
+          dense_matrix.AddNode(i, mp[node.feat_id], node.feat_val, node.field_id);
+      }
+    }
   }
 
   // Serialize current DMatrix to disk file.
