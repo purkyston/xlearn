@@ -272,7 +272,8 @@ struct DMatrix {
   //  | New id     :   0   1   2   3   |
   //  ----------------------------------
 
-  void CompressBySort(DMatrix& dense_matrix, feature_map& mp) {
+  void CompressBySort(DMatrix& dense_matrix, feature_map& mp) const {
+    dense_matrix.ResetMatrix(this->row_length, this->has_label);
     size_t node_num{0};
     for (auto row : this->row) {
       node_num += row->size();
@@ -297,13 +298,14 @@ struct DMatrix {
     }
   }
 
-  void CompressByHash(DMatrix& dense_matrix, feature_map& mp) {
+  void CompressByHash(DMatrix& dense_matrix, feature_map& mp) const {
+    dense_matrix.ResetMatrix(this->row_length, this->has_label);
     size_t node_num{0};
     for (auto row : this->row) {
       node_num += row->size();
     }
     mp.reserve(node_num);
-    size_t unique_num{0};
+    size_t unique_num{1};
     for (index_t i = 0; i < this->row_length; ++ i) {
       for (auto node: *this->row[i]) {
         auto itr = mp.find(node.feat_id);
@@ -312,17 +314,18 @@ struct DMatrix {
           dense_matrix.AddNode(i, unique_num, node.feat_val);
           ++ unique_num;
         } else {
-          dense_matrix.AddNode(i, (*itr).second, node.feat_val);
+          dense_matrix.AddNode(i, itr->second, node.feat_val);
         }
       }
     }
   }
 
-  void CompressByHeap(DMatrix& dense_matrix, feature_map& mp) {
+  void CompressByHeap(DMatrix& dense_matrix, feature_map& mp) const {
+    dense_matrix.ResetMatrix(this->row_length, this->has_label);
     struct PQNode {
         index_t row_id, col_id, feat_id;
         bool operator< (const PQNode& rhs) const {
-          return col_id > rhs.col_id;
+          return feat_id > rhs.feat_id;
         }
     };
     std::priority_queue<PQNode> pq;
@@ -330,17 +333,17 @@ struct DMatrix {
       pq.push(PQNode{i, 0, (*this->row[i])[0].feat_id});
     }
     index_t last(-1);
-    unique_num = 0;
+    index_t unique_num = 1;
     while(!pq.empty()) {
       auto now = pq.top();
       pq.pop();
       if (now.feat_id != last) {
         last = now.feat_id;
         mp[last] = unique_num;
-        dense_matrix.AddNode(now.row_id, unique_num, (*this->row[now.row_id])[now.col_id].feat_id);
+        dense_matrix.AddNode(now.row_id, unique_num, (*this->row[now.row_id])[now.col_id].feat_val);
         ++ unique_num;
       } else {
-        dense_matrix.AddNode(now.row_id, unique_num - 1, (*this->row[now.row_id])[now.col_id]);
+        dense_matrix.AddNode(now.row_id, unique_num - 1, (*this->row[now.row_id])[now.col_id].feat_val);
       }
       if (now.col_id + 1 < (*this->row[now.row_id]).size()) {
         pq.push(PQNode{now.row_id, now.col_id + 1, (*this->row[now.row_id])[now.col_id + 1].feat_id});
@@ -372,7 +375,12 @@ struct DMatrix {
   //  -------------------------------------------------
   void Compress(std::vector<index_t>& feature_list) {
     // Using a map to store the mapping relations
-    feature_map mp; 
+    feature_map mp;
+    size_t feature_num{0};
+    for (index_t i = 0; i < this->row_length; ++ i) {
+      feature_num += (*this->row[i]).size();
+    }
+    mp.reserve(feature_num);
     index_t idx = 1;
     for (index_t i = 0; i < this->row_length; ++i) {
       SparseRow* row = this->row[i];
@@ -384,12 +392,78 @@ struct DMatrix {
           mp[iter->feat_id] = idx;
           feature_list.push_back(iter->feat_id);
           iter->feat_id = idx;
-          idx++;
+          ++ idx;
         } else {
           iter->feat_id = got->second;
         }
       }
     } 
+  }
+
+  void CompressByHash(std::vector<index_t>& feature_list) {
+    this->Compress(feature_list);
+  }
+
+  void CompressByHeap(std::vector<index_t>& feature_list) {
+    struct PQNode {
+        index_t row_id, col_id, feat_id;
+        bool operator< (const PQNode& rhs) const {
+          return feat_id > rhs.feat_id;
+        }
+    };
+    std::priority_queue<PQNode> pq;
+    for (index_t i = 0; i < row_length; ++ i) {
+      pq.push(PQNode{i, 0, (*this->row[i])[0].feat_id});
+    }
+    index_t last(-1);
+    index_t unique_num = 1;
+    while(!pq.empty()) {
+      auto now = pq.top();
+      pq.pop();
+      if (now.feat_id != last) {
+        last = now.feat_id;
+        feature_list.push_back(last);
+        (*this->row[now.row_id])[now.col_id].feat_id = unique_num;
+        ++ unique_num;
+      } else {
+        (*this->row[now.row_id])[now.col_id].feat_id = unique_num - 1;
+      }
+      if (now.col_id + 1 < (*this->row[now.row_id]).size()) {
+        pq.push(PQNode{now.row_id, now.col_id + 1, (*this->row[now.row_id])[now.col_id + 1].feat_id});
+      }
+    }
+  }
+
+  void CompressBySort(std::vector<index_t>& feature_list) {
+    size_t node_num{0};
+    for (auto row : this->row) {
+      node_num += row->size();
+    }
+    feature_list.reserve(node_num);
+    for (auto row_ptr: this->row) {
+      for(auto i : *row_ptr) {
+        feature_list.push_back(i.feat_id);
+      }
+    }
+    std::sort(begin(feature_list), end(feature_list));
+    feature_list.erase(std::unique(begin(feature_list), end(feature_list)), end(feature_list));
+    feature_map mp;
+    for (index_t i = 0; i < feature_list.size(); ++ i) {
+      mp[feature_list[i]] = i + 1;
+    }
+    for (index_t i = 0; i < row_length; ++ i) {
+      for (auto &node : *this->row[i]) {
+        node.feat_id = mp[node.feat_id];
+      }
+    }
+  }
+
+  void Decompress(std::vector<index_t>& feature_list) {
+    for (auto row_ptr : this->row) {
+      for (auto& i : *row_ptr) {
+        i.feat_id = feature_list[i.feat_id];
+      }
+    }
   }
 
   // Get a mini-batch of data from curremt data matrix. 

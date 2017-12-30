@@ -202,6 +202,22 @@ index_t InmemReader::Samples(DMatrix* &matrix) {
   return num_samples_;
 }
 
+// Test DMatrix compress
+void InmemReader::Compress(const std::string& method) {
+  /* method = hash / sort / heap
+   * */
+  std::vector<index_t> feature_list;
+  if (method == "hash") {
+    data_buf_.CompressByHash(feature_list);
+  } else if (method == "sort") {
+    data_buf_.CompressBySort(feature_list);
+  } else if (method == "heap") {
+    data_buf_.CompressByHeap(feature_list);
+  } else {
+    assert(false);
+  }
+}
+
 // Return to the begining of the data buffer.
 void InmemReader::Reset() { pos_ = 0; }
 

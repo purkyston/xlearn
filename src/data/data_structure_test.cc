@@ -23,6 +23,7 @@ This file tests data_structure.h
 #include "gtest/gtest.h"
 
 #include "src/data/data_structure.h"
+#include "src/reader/reader.h"
 
 namespace xLearn {
 
@@ -136,6 +137,36 @@ TEST(DMATRIX_TEST, CopyFrom) {
   }
 }
 
+void CheckDMatrixEqual(const DMatrix& orignal, const DMatrix& compressed, feature_map& mp) {
+  for (index_t i = 0; i < orignal.row_length; ++ i) {
+    for (auto j : *orignal.row[i]) {
+      real_t val{-1.};
+      for (auto k : *compressed.row[i]) {
+        if (k.feat_id == mp[j.feat_id]) {
+          val = k.feat_val;
+        }
+      }
+      EXPECT_EQ(val, j.feat_val);
+    }
+  }
+}
+
+void CheckDMatrixEqual(const DMatrix& orignal,
+                       const DMatrix& compressed,
+                       const std::vector<index_t>& feature_list) {
+  for (index_t i = 0; i < compressed.row_length; ++ i) {
+    for (auto j : *compressed.row[i]) {
+      real_t val{-1.};
+      for (auto k : *orignal.row[i]) {
+        if (k.feat_id == feature_list[j.feat_id - 1]) {
+          val = k.feat_val;
+        }
+      }
+      EXPECT_EQ(val, j.feat_val);
+    }
+  }
+}
+
 TEST(DMATRIX_TEST, Compress) {
   // Init matrix
   DMatrix matrix;
@@ -157,9 +188,41 @@ TEST(DMATRIX_TEST, Compress) {
   matrix.AddNode(3, 2, 0.1);
   matrix.AddNode(3, 4, 0.1);
   matrix.AddNode(3, 7, 0.1);
+
+  DMatrix orignal_matrix;
+  orignal_matrix.CopyFrom(&matrix);
   // Compress
   std::vector<index_t> feature_list;
-  matrix.Compress(feature_list);
+  matrix.CompressByHash(feature_list);
+  std::cout << "compress by hash" << std::endl;
+  CheckDMatrixEqual(orignal_matrix, matrix, feature_list);
+  matrix.CopyFrom(&orignal_matrix);
+  feature_list.clear();
+  matrix.CompressByHeap(feature_list);
+  std::cout << "compress by heap" << std::endl;
+  CheckDMatrixEqual(orignal_matrix, matrix, feature_list);
+  matrix.CopyFrom(&orignal_matrix);
+  feature_list.clear();
+  matrix.CompressBySort(feature_list);
+  std::cout << "compress by sort" << std::endl;
+  CheckDMatrixEqual(orignal_matrix, matrix, feature_list);
+
+  DMatrix compressed_dmatrix;
+  feature_map mp;
+  std::cout << "compress by hash" << std::endl;
+  orignal_matrix.CompressByHash(compressed_dmatrix, mp);
+  CheckDMatrixEqual(orignal_matrix, compressed_dmatrix, mp);
+  compressed_dmatrix.Release();
+  mp.clear();
+  std::cout << "compress by sort" << std::endl;
+  orignal_matrix.CompressBySort(compressed_dmatrix, mp);
+  CheckDMatrixEqual(orignal_matrix, compressed_dmatrix, mp);
+  compressed_dmatrix.Release();
+  mp.clear();
+  std::cout << "compress by heap" << std::endl;
+  orignal_matrix.CompressByHeap(compressed_dmatrix, mp);
+  CheckDMatrixEqual(orignal_matrix, compressed_dmatrix, mp);
+  /*
   // row_0
   SparseRow* row = matrix.row[0];
   EXPECT_EQ((*row)[0].feat_id, 1);
@@ -193,6 +256,25 @@ TEST(DMATRIX_TEST, Compress) {
   EXPECT_EQ(feature_list[8], 2);
   EXPECT_EQ(feature_list[9], 4);
   EXPECT_EQ(feature_list[10], 7);
+  */
+}
+
+TEST(DMATRIX_TEST, CompressByHash) {
+  InmemReader reader;
+  reader.Initialize("./large_train.txt");
+  reader.Compress("hash");
+}
+
+TEST(DMATRIX_TEST, CompressBySort) {
+  InmemReader reader;
+  reader.Initialize("./large_train.txt");
+  reader.Compress("sort");
+}
+
+TEST(DMATRIX_TEST, CompressByHeap) {
+  InmemReader reader;
+  reader.Initialize("./large_train.txt");
+  reader.Compress("heap");
 }
 
 TEST(DMATRIX_TEST, GetMiniBatch) {

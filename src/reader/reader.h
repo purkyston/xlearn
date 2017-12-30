@@ -171,6 +171,9 @@ class InmemReader : public Reader {
     }
   }
 
+  // Test dmatrix compress
+  void Compress(const std::string& method="hash");
+
  protected:
   /* Reader will load all the data 
   into this buffer */
