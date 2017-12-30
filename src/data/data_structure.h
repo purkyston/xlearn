@@ -452,7 +452,13 @@ struct DMatrix {
       }
     }
     std::sort(begin(feature_list), end(feature_list));
-    feature_list.erase(std::unique(begin(feature_list), end(feature_list)), end(feature_list));
+    index_t new_size{1};
+    for (index_t i = 1; i < feature_list.size(); ++ i) {
+      if (feature_list[i] != feature_list[i - 1]) {
+        feature_list[new_size ++] = feature_list[i];
+      }
+    }
+    feature_list.erase(feature_list.begin() + new_size, end(feature_list));
     feature_map mp;
     for (index_t i = 0; i < feature_list.size(); ++ i) {
       mp[feature_list[i]] = i + 1;

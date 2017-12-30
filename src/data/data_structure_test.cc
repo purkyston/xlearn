@@ -22,6 +22,7 @@ This file tests data_structure.h
 
 #include "gtest/gtest.h"
 
+#include "src/base/timer.h"
 #include "src/data/data_structure.h"
 #include "src/reader/reader.h"
 
@@ -259,22 +260,34 @@ TEST(DMATRIX_TEST, Compress) {
   */
 }
 
+TEST(DMATRIX_TEST, CompressBySort) {
+    InmemReader reader;
+    reader.Initialize("./large_train.txt");
+    Timer timer;
+    timer.tic();
+    reader.Compress("sort");
+    float time = timer.toc();
+    std::cout << "compress time cost:" << time << std::endl;
+}
+
 TEST(DMATRIX_TEST, CompressByHash) {
   InmemReader reader;
   reader.Initialize("./large_train.txt");
+  Timer timer;
+  timer.tic();
   reader.Compress("hash");
-}
-
-TEST(DMATRIX_TEST, CompressBySort) {
-  InmemReader reader;
-  reader.Initialize("./large_train.txt");
-  reader.Compress("sort");
+  float time = timer.toc();
+  std::cout << "compress time cost:" << time << std::endl;
 }
 
 TEST(DMATRIX_TEST, CompressByHeap) {
   InmemReader reader;
   reader.Initialize("./large_train.txt");
+  Timer timer;
+  timer.tic();
   reader.Compress("heap");
+  float time = timer.toc();
+  std::cout << "compress time cost:" << time << std::endl;
 }
 
 TEST(DMATRIX_TEST, GetMiniBatch) {
