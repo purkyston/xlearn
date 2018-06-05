@@ -3,7 +3,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/test/data)
 
 # Build static library
 set(STA_DEPS base)
-add_library(data STATIC model_parameters.cc parameter_initializer.h)
+add_library(data STATIC model_parameters.cc parameter_initializer.h parameter_initializer_test.cc)
 target_link_libraries(data ${STA_DEPS})
 
 # Build unittests.
@@ -14,6 +14,9 @@ target_link_libraries(data_structure_test gtest_main ${LIBS})
 
 add_executable(model_parameters_test model_parameters_test.cc)
 target_link_libraries(model_parameters_test gtest_main ${LIBS})
+
+add_executable(parameter_initializer_test parameter_initializer_test.cc)
+target_link_libraries(parameter_initializer_test gtest_main ${LIBS})
 
 # Install library and header files
 install(TARGETS data DESTINATION lib/data)
